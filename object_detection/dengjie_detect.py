@@ -33,7 +33,7 @@ def mode_select(state):
     if state == 'picture':
         return 1
     elif state == 'video':
-        video = "../1.mp4"
+        video = "../video5.mp4"
     else:
         video = "http://admin:admin@192.168.0.13:8081"
         # video = 0
@@ -116,7 +116,6 @@ def video(out_video=True):
         out = cv2.VideoWriter('../result_video.avi', fourcc, FPS, (frameWidth, frameHeight), isColor)
         root = '../result_frame'
         list = os.listdir(root)
-        print('list', list)
         print(len(list))
         for i in range(len(list)):
             frame = cv2.imread(
@@ -148,7 +147,7 @@ if __name__ == '__main__':
     detection_graph, category_index = load_model()  # 加载模型
     path = '../test_pic'  # 待检测图片的路径
     i = 0  # 图片计数
-    state = 'real_time'  # 检测模式选择,state = 'video','picture','real_time'
+    state = 'picture'  # 检测模式选择,state = 'video','picture','real_time'
     with detection_graph.as_default():
         with tf.Session(config=config) as sess:
             cap = mode_select(state)
