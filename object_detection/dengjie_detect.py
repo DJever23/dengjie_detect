@@ -1,41 +1,24 @@
 import numpy as np
 import os
-import six.moves.urllib as urllib
 import sys
-import tarfile
 import tensorflow as tf
-import zipfile
 import time
-
 from distutils.version import StrictVersion
-from collections import defaultdict
-from io import StringIO
-from matplotlib import pyplot as plt
-from PIL import Image
-
-# This is needed since the notebook is stored in the object_detection folder.
-sys.path.append("..")
-from object_detection.utils import ops as utils_ops
 
 if StrictVersion(tf.__version__) < StrictVersion('1.9.0'):
     raise ImportError('Please upgrade your TensorFlow installation to v1.9.* or later!')
-
 # 增加导入cv包，以及获取摄像头设备号
 import cv2
 
-# video = "http://admin:admin@192.168.0.13:8081"
-# video = 0
-video = "../1.mp4"
-cap = cv2.VideoCapture(video)
-
-# 从utils模块引入label_map_util和visualization_utils,label_map_util用于后面获取图像标签和类别，visualization_utils用于可视化。
-#from object_detection.utils import label_map_util as label_map
-from utils import label_map_util
-#from object_detection.utils import visualization_utils as vis_util
-from utils import visualization_utils as vis_util
-
-# import label_map_util
-# import visualization_utils as vis_util
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # 获取文件的绝对路径，再获取文件目录
+sys.path.append(BASE_DIR)
+sys.path.append(os.path.join(BASE_DIR, './utils'))
+# This is needed since the notebook is stored in the object_detection folder.
+sys.path.append("..")
+import label_map_util
+import visualization_utils as vis_util
+# 从utils模块引入label_map_util和visualization_utils,label_map_util用于后面获取图像标签和类别，
+# visualization_utils用于可视化。
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'  # use GPU with ID=0
 config = tf.ConfigProto()
@@ -63,23 +46,35 @@ with detection_graph.as_default():
 
 # 加载lable map
 label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
-categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES, use_display_name=True)
+categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
+                                                            use_display_name=True)
 category_index = label_map_util.create_category_index(categories)
 i = 0
+state = 'video'  # state = 'video', 'real_time', 'picture'
+if state == 'video':
+    video = "../1.mp4"
+    cap = cv2.VideoCapture(video)
+elif state == 'real_time':
+    video = "http://admin:admin@192.168.0.13:8081"
+    # video = 0
+    cap = cv2.VideoCapture(video)
+
 # 核心代码
 with detection_graph.as_default():
-    with tf.Session(graph=detection_graph) as sess:
-        while True:
+    # with tf.Session(graph=detection_graph) as sess:
+    with tf.Session(config=config) as sess:
+        while state == 'video' or state == 'real_time':
             stime = time.time()  # 计算起始时间
             ret, image_np = cap.read()
             # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
             image_np_expanded = np.expand_dims(image_np, axis=0)
-            print('image_np_expanded', image_np_expanded.shape)
-            print('image_np_expanded.ndim', image_np_expanded.ndim)
-            if image_np_expanded.ndim != 4:
-                cap.release()
-                cv2.destroyAllWindows()
-                break
+            # print('image_np_expanded', image_np_expanded.shape)
+            # print('image_np_expanded.ndim', image_np_expanded.ndim)
+            if state == 'video':
+                if image_np_expanded.ndim != 4:
+                    cap.release()
+                    cv2.destroyAllWindows()
+                    break
             image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
             # Each box represents a part of the image where a particular object was detected.
             boxes = detection_graph.get_tensor_by_name('detection_boxes:0')
@@ -101,32 +96,69 @@ with detection_graph.as_default():
                 line_thickness=8)
 
             cv2.imshow('object detection', cv2.resize(image_np, (800, 600)))
-            print('FPS{:.1f}'.format(1 / (time.time() - stime)))
-            cv2.imwrite('../result_frame/result_frame_%d.jpg' % i, image_np)
-            i += 1
+
+            if state == 'video':
+                print('FPS{:.1f}'.format(1 / (time.time() - stime)))
+                cv2.imwrite('../result_frame/result_frame_%d.jpg' % i, image_np)
+                i += 1
+            elif state == 'real_time':
+                print('FPS{:.1f}'.format(1 / (time.time() - stime)))
+
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
                 break
-cap.release()
-cv2.destroyAllWindows()
-out_video = 1
-if out_video:
-    img = cv2.imread('/home/dengjie/dengjie/project/detection/from_blog/result_frame/result_frame_0.jpg',1)
-    image_name = []
-    isColor = 1
-    fps = 30.0
-    frameWidth = img.shape[1]
-    frameHeight = img.shape[0]
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter('../result_video.avi', fourcc, fps, (frameWidth, frameHeight), isColor)
-    root = '../result_frame'
-    list = os.listdir(root)
-    print('list',list)
-    print(len(list))
-    for i in range(len(list)):
-        frame = cv2.imread('/home/dengjie/dengjie/project/detection/from_blog/result_frame/result_frame_%d.jpg'%i,1)
-        out.write(frame)
-        if cv2.waitKey(25) & 0xFF == ord('q'):
-            break
-    out.release()
-    print('video has already saved.')
+        if state == 'video' or state == 'real_time':
+            cap.release()
+            cv2.destroyAllWindows()
+        if state == 'video':
+            out_video = 1
+
+            if out_video:
+                img = cv2.imread('/home/dengjie/dengjie/project/detection/from_blog/result_frame/result_frame_0.jpg', 1)
+                image_name = []
+                isColor = 1
+                fps = 20.0
+                frameWidth = img.shape[1]
+                frameHeight = img.shape[0]
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
+                out = cv2.VideoWriter('../result_video.avi', fourcc, fps, (frameWidth, frameHeight), isColor)
+                root = '../result_frame'
+                list = os.listdir(root)
+                print('list', list)
+                print(len(list))
+                for i in range(len(list)):
+                    frame = cv2.imread(
+                        '/home/dengjie/dengjie/project/detection/from_blog/result_frame/result_frame_%d.jpg' % i, 1)
+                    out.write(frame)
+                    if cv2.waitKey(25) & 0xFF == ord('q'):
+                        break
+                out.release()
+                print('video has already saved.')
+
+        if state == 'picture':
+            path = '../test_pic'
+            test_list = os.listdir(path)
+            for i in range(len(test_list)):
+                image_np = cv2.imread('/home/dengjie/dengjie/project/detection/from_blog/test_pic/' + test_list[i], 1)
+                stime = time.time()
+                # print('%d'%i,image_np)
+                image_np_expanded = np.expand_dims(image_np, axis=0)
+                image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
+                boxes = detection_graph.get_tensor_by_name('detection_boxes:0')
+                scores = detection_graph.get_tensor_by_name('detection_scores:0')
+                classes = detection_graph.get_tensor_by_name('detection_classes:0')
+                num_detections = detection_graph.get_tensor_by_name('num_detections:0')
+                (boxes, scores, classes, num_detections) = sess.run(
+                    [boxes, scores, classes, num_detections],
+                    feed_dict={image_tensor: image_np_expanded})
+                vis_util.visualize_boxes_and_labels_on_image_array(
+                    image_np, np.squeeze(boxes),
+                    np.squeeze(classes).astype(np.int32),
+                    np.squeeze(scores), category_index,
+                    use_normalized_coordinates=True,
+                    line_thickness=8)
+                cv2.imshow('object detection', cv2.resize(image_np, (800, 600)))
+                cv2.imwrite('../result_test/result_pic_%d.jpg' % i, image_np)
+                print('spend{:.5f}s'.format((time.time() - stime)))
+                cv2.waitKey()
+            cv2.destroyAllWindows()
